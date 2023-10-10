@@ -1,19 +1,38 @@
-# Starter pipeline
-# Start with a minimal pipeline that you can customize to build and deploy your code.
-# Add steps that build, run tests, deploy, and more:
-# https://aka.ms/yaml
-
+name: sampleApp_$(Date:yyyyMMdd)$(Rev:.r)
 trigger:
-- master
-
-pool:
-  vmImage: ubuntu-latest
-
-steps:
-- script: echo Hello, world!
-  displayName: 'Run a one-line script'
-
-- script: |
-    echo Add other tasks to build, test, and deploy your project.
-    echo See https://aka.ms/yaml
-  displayName: 'Run a multi-line script'
+- main
+stages:
+- stage: Build
+  jobs:
+  - job: Build
+    pool:
+      vmImage: windows-latest
+    steps:
+    - task: VSBuild@1
+      inputs:
+        solution: '**\*.sln'
+        msbuildArgs: '/p:DeployOnBuild=true /p:WebPublishMethod=Package /p:PackageAsSingleFile=true /p:SkipInvalidConfigurations=true /p:PackageLocation="$(build.artifactstagingdirectory)\\"'
+    - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+        ArtifactName: 'drop'
+        publishLocation: 'Container'
+- stage: DeploytheApplication
+  jobs:
+    - job: Deploy
+      pool:
+       vmImage: windows-latest
+      steps:
+       - task: DownloadBuildArtifacts@1
+         inputs:
+           buildType: 'current'
+           downloadType: 'specific'
+           downloadPath: '$(System.ArtifactsDirectory)'
+       - task: AzureRmWebAppDeployment@4
+         inputs:
+          ConnectionType: 'AzureRM'
+          azureSubscription: 'Pay-As-You-Go(18c3fb70-e4b5-4cce-90c6-c2a7d33b2b85)'
+          appType: 'webApp'
+          WebAppName: 'testapp'
+          packageForLinux: '$(System.ArtifactsDirectory)/**/*.zip'
+        
